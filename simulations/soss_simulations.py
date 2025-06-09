@@ -114,12 +114,20 @@ def run_simulations(N_simulations=10, output_file='soss_simulations.h5', targ_Te
             [aperture] * N_simulations
         ))
 
-    # Save results to HDF5
+    simulation_data = np.array([r[0] for r in results])
+    meta_contaminants = np.array([r[1] for r in results], dtype="object")
+    simulation_clean = np.array([r[2] for r in results])
+    simulation_contaminant = np.array([r[3] for r in results])
+    meta_target = np.array([teffs, Jmags]).T
+
     with h5py.File(output_file, "w") as f:
-        for i, (data, clist, clean) in enumerate(results):
-            f.create_dataset(f"data_{i}", data=data, compression="gzip")
-            f.create_dataset(f"meta_{i}", data=clist, compression="gzip")
-            f.create_dataset(f"clean_{i}", data=clean, compression="gzip")
+        f.create_dataset("simulation_data", data=simulation_data, compression="gzip")
+        f.create_dataset("simulation_clean", data=simulation_clean, compression="gzip")
+        f.create_dataset("simulation_contaminant", data=simulation_contaminant, compression="gzip")
+
+    np.save(output_file.replace(".h5", "_meta_contaminants.npy"), meta_contaminants)
+    np.save(output_file.replace(".h5", "_meta_target.npy"), meta_target)
+
 
     print("Results saved to", output_file)
 
@@ -162,6 +170,7 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
     """
     # Make a blank scene
     scene = np.zeros((96 if aperture == 'NIS_SUBSTRIP96' else 256, 2048)).astype(np.float32)
+    contaminant_scene = scene.copy()
 
     # Get the order 1/2/3 traces and scale
     trace_o1, trace_o2, trace_o3 = fs.get_trace(aperture, targ_Teff, 'STAR')
@@ -188,7 +197,7 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
 
     clean_scene = scene.copy()
     # Get the order 0 stamp
-    order0 = fs.get_order0(aperture) * 1.5e8 # Scaling factor based on observations
+    order0 = fs.get_order0(aperture) * 1e7 # Scaling factor based on observations
 
     # Add the random order 0s
     target_rows, target_cols = scene.shape
@@ -226,6 +235,10 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
         scene[target_start_row:target_end_row, target_start_col:target_end_col] += \
             factor * order0[array_start_row:array_end_row, array_start_col:array_end_col]
 
+        # Place the scaled array of ones in the empty target array
+        contaminant_scene[target_start_row:target_end_row, target_start_col:target_end_col] += \
+            factor * order0[array_start_row:array_end_row, array_start_col:array_end_col]
+
     if plot:
         # Make the plot
         plt = figure(title=f"{N_contaminants} Contaminants", width=900, height=300,
@@ -245,4 +258,4 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
 
         show(plt)
 
-    return scene, contam_list, clean_scene
+    return scene, contam_list, clean_scene, contaminant_scene
