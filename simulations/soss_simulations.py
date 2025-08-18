@@ -124,8 +124,8 @@ def run_simulations(N_simulations=10, output_file='soss_simulations.h5', targ_Te
     print("Results saved to", output_file)
 
 
-def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 16), aperture='NIS_SUBSTRIP256',
-                  scale='linear', norm=1000, plot=False):
+def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 16), teff_range=(2400, 7000),
+                  aperture='NIS_SUBSTRIP256', scale='linear', norm=1000, plot=False):
     """Produce a contamination field simulation at the given sky coordinates
 
     Parameters
@@ -142,6 +142,8 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
         The range of Teff values to sample from
     Jmag_range: tuple
         The range of Jmag values to sample from
+    teff_range: tuple
+        The range of teff values to sample from
     aperture: str
         The name of the aperture to use, ['NIS_SUBSTRIP256', 'NIS_SUBSTRIP96', 'NIS_FULL']
 
@@ -187,12 +189,10 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
     scene += trace_o3 * targ_Jmag * norm
 
     clean_scene = scene.copy()
-    # Get the order 0 stamp
-    order0 = fs.get_order0(aperture) * 1.5e8 # Scaling factor based on observations
 
     # Add the random order 0s
     target_rows, target_cols = scene.shape
-    array_rows, array_cols = order0.shape
+    array_rows, array_cols = 50, 50
     contam_list = []
     for _ in range(N_contaminants):
 
@@ -202,6 +202,12 @@ def simulate_soss(targ_Teff=6000, targ_Jmag=9, N_contaminants=5, Jmag_range=(1, 
 
         # Randomly choose a multiplication factor from the specified range
         factor = random.uniform(*Jmag_range)
+
+        # Randomly choose a Teff value from the specified range
+        teff = int(random.uniform(*teff_range))
+
+        # Get the order 0 stamp
+        order0 = fs.get_order0(aperture, teff) * 1.5e3  # Scaling factor based on observations
 
         # Determine overlap region in the target array
         end_row = start_row + array_rows
